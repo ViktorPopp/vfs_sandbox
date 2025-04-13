@@ -1,9 +1,9 @@
-use vfs_sandbox::VFS;
+use vfs_sandbox::Vfs;
 
 fn main() {
     print!("----- START OF PROGRAM -----\n");
 
-    let _vfs: VFS;
+    let mut _vfs = Vfs::new();
 
     print!("------ END OF PROGRAM ------\n");
 }
