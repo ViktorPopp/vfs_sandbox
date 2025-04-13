@@ -1,95 +1,75 @@
-pub mod mockfs;
+#![allow(dead_code, unused_imports)]
 
-#[derive(PartialEq, Clone)]
-pub enum Type {
+use bitflags::bitflags;
+
+pub mod utils;
+
+/* VNODE */
+
+#[derive(Clone)]
+pub struct Vnode {
+    name: String,
+    pub vtype: VnodeType,
+    pub ops: Option<VnodeOps>,
+    pub flags: VnodeFlags,
+    pub mount: Box<Mount>,
+    pub fs_data: Option<Box<dyn utils::AnyClone>>,
+}
+
+#[derive(Clone)]
+pub enum VnodeType {
     Regular,
     Directory,
     BlockDevice,
     CharDevice,
-    SymbolicLink,
-    Socket,
 }
 
-pub struct MountPoint {
-    path: String,
-    fs: Box<dyn Filesystem>,
+#[derive(Clone)]
+pub struct VnodeOps {
+    pub read: fn(&Vnode, &mut [u8], usize) -> i32,
+    pub lookup: fn(&str) -> Vnode,
 }
 
-pub struct MountManager {
-    mounts: Vec<MountPoint>,
-}
-
-impl MountManager {
-    pub fn new() -> Self {
-        Self { mounts: Vec::new() }
-    }
-
-    pub fn mount(&mut self, mount_path: String, fs: Box<dyn Filesystem>) {
-        // Ensure mount path starts with /
-        let path = if !mount_path.starts_with('/') {
-            format!("/{}", mount_path)
-        } else {
-            mount_path
-        };
-        
-        self.mounts.push(MountPoint { path, fs });
-    }
-
-    pub fn open(&self, path: String) -> Result<Vnode, String> {
-        // Ensure path starts with /
-        let path = if !path.starts_with('/') {
-            format!("/{}", path)
-        } else {
-            path.clone()
-        };
-
-        // Try each mount point, longest paths first to handle nested mounts
-        for mount in self.mounts.iter().rev() {
-            if path == mount.path || path.starts_with(&format!("{}/", mount.path)) {
-                // Remove mount path prefix to get relative path within filesystem
-                let relative_path = if path == mount.path {
-                    "/".to_string()
-                } else {
-                    path[mount.path.len()..].to_string()
-                };
-                
-                if let Ok(mut node) = mount.fs.open(relative_path) {
-                    // Adjust node name to include full path
-                    if path != "/" {
-                        node.name = path;
-                    }
-                    return Ok(node);
-                }
-            }
-        }
-        Err("File not found".to_string())
+bitflags! {
+    #[derive(Clone)]
+    pub struct VnodeFlags: u8 {
+        const ROOT = 0x1;
+        const USED = 0x2;
     }
 }
 
-pub trait Filesystem {
-    fn open(&self, path: String) -> Result<Vnode, String>;
-    fn read(&self, node: &Vnode) -> Result<Vec<u8>, String>;
-    fn close(&self, node: &Vnode) -> Result<(), String>;
+/* MOUNT */
+
+#[derive(Clone)]
+pub struct Mount {
+    root: Vnode,
+    next: Option<Box<Mount>>,
+    prev: Option<Box<Mount>>,
+    mountpoint: String,
+    fs_data: Option<Box<dyn utils::AnyClone>>,
 }
 
-pub struct Vnode {
-    pub name: String,
-    pub file_type: Type,
-    pub size: u64,
-    pub parent: Option<Box<Vnode>>,
-    pub children: Option<Vec<Vnode>>,
-    data: Vec<u8>, // Private Fs-specific data
+/* VFS */
+
+pub struct VFS {
+    pub root_mount: Box<Mount>,
 }
 
-impl Clone for Vnode {
-    fn clone(&self) -> Self {
-        Self {
-            name: self.name.clone(),
-            file_type: self.file_type.clone(),
-            size: self.size,
-            parent: self.parent.clone(),
-            children: self.children.clone(),
-            data: self.data.clone(),
-        }
+impl VFS {
+    pub fn init(&mut self) {
+        self.root_mount = Box::new(Mount {
+            root: Vnode {
+                name: String::from("/"),
+                vtype: VnodeType::Directory,
+                flags: VnodeFlags::ROOT,
+                ops: None,
+                mount: self.root_mount.clone(),
+                fs_data: None,
+            },
+            next: None,
+            prev: None,
+            mountpoint: String::from("/"),
+            fs_data: None,
+        });
     }
 }
