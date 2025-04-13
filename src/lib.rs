@@ -10,8 +10,13 @@ pub enum Type {
     Socket,
 }
 
+pub struct MountPoint {
+    path: String,
+    fs: Box<dyn Filesystem>,
+}
+
 pub struct MountManager {
-    mounts: Vec<Box<dyn Filesystem>>,
+    mounts: Vec<MountPoint>,
 }
 
 impl MountManager {
@@ -19,14 +24,42 @@ impl MountManager {
         Self { mounts: Vec::new() }
     }
 
-    pub fn mount(&mut self, fs: Box<dyn Filesystem>) {
-        self.mounts.push(fs);
+    pub fn mount(&mut self, mount_path: String, fs: Box<dyn Filesystem>) {
+        // Ensure mount path starts with /
+        let path = if !mount_path.starts_with('/') {
+            format!("/{}", mount_path)
+        } else {
+            mount_path
+        };
+        
+        self.mounts.push(MountPoint { path, fs });
     }
 
     pub fn open(&self, path: String) -> Result<Vnode, String> {
-        for fs in &self.mounts {
-            if let Ok(node) = fs.open(path.clone()) {
-                return Ok(node);
+        // Ensure path starts with /
+        let path = if !path.starts_with('/') {
+            format!("/{}", path)
+        } else {
+            path.clone()
+        };
+
+        // Try each mount point, longest paths first to handle nested mounts
+        for mount in self.mounts.iter().rev() {
+            if path == mount.path || path.starts_with(&format!("{}/", mount.path)) {
+                // Remove mount path prefix to get relative path within filesystem
+                let relative_path = if path == mount.path {
+                    "/".to_string()
+                } else {
+                    path[mount.path.len()..].to_string()
+                };
+                
+                if let Ok(mut node) = mount.fs.open(relative_path) {
+                    // Adjust node name to include full path
+                    if path != "/" {
+                        node.name = path;
+                    }
+                    return Ok(node);
+                }
             }
         }
         Err("File not found".to_string())
