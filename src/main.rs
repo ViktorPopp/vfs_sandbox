@@ -41,7 +41,6 @@ bitflags! {
     }
 }
 
-
 pub struct Vfs {
     pub vfs_next: Option<Box<Vfs>>,
 
