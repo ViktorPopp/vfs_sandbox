@@ -25,7 +25,7 @@ enum VfsError {
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct FilePermissions: u16 {
-        const MOUNTPOINT  = 0x0001;
+        const MOUNTPOINT  = 0x8000;
 
         const USER_READ   = 0x0100;
         const USER_WRITE  = 0x0080;
