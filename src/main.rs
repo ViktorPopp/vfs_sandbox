@@ -1,9 +1,12 @@
-use vfs_sandbox::VFS;
+use vfs_sandbox::Vfs;
 
 fn main() {
     print!("----- START OF PROGRAM -----\n");
 
-    let _vfs: VFS;
+    println!("> Creating new Vfs instance...");
+    let mut vfs: Vfs = Vfs::new();
+    println!("> Initializing the Vfs instance...");
+    vfs.init();
 
     print!("------ END OF PROGRAM ------\n");
 }

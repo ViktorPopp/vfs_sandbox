@@ -8,34 +8,66 @@ pub mod utils;
 
 #[derive(Clone)]
 pub struct Vnode {
-    name: String,
+    pub name: String,
     pub vtype: VnodeType,
-    pub ops: Option<VnodeOps>,
-    pub flags: VnodeFlags,
+    pub ops: Option<Box<dyn utils::AnyClone>>,
+    pub flags: Option<OpenFlags>,
     pub mount: Box<Mount>,
     pub fs_data: Option<Box<dyn utils::AnyClone>>,
 }
 
 #[derive(Clone)]
 pub enum VnodeType {
+    Unknown,
     Regular,
     Directory,
     BlockDevice,
     CharDevice,
+    Bad,
+}
+
+type RdWrDir = bool;
+
+pub trait VnodeOps: Send + Sync + utils::AnyClone {
+    fn lookup(directory: Vnode, name: String) -> Result<Vnode, String>;
+    fn open(old_vnode: Vnode, flags: OpenFlags) -> Result<Vnode, String>;
+    fn rdwr(
+        &self,
+        vnode: &Vnode,
+        length: usize,
+        offset: usize,
+        direction: RdWrDir,
+    ) -> Result<*mut u8, String>;
 }
 
 #[derive(Clone)]
-pub struct VnodeOps {
-    pub read: fn(&Vnode, &mut [u8], usize) -> i32,
-    pub lookup: fn(&str) -> Vnode,
-}
+pub enum OpenFlags {
+    // File Access Flags
+    ReadOnly,  // Open for reading only
+    WriteOnly, // Open for writing only
+    ReadWrite, // Open for both reading and writing
 
-bitflags! {
-    #[derive(Clone)]
-    pub struct VnodeFlags: u8 {
-        const ROOT = 0x1;
-        const USED = 0x2;
-    }
+    // File Creation and Status Flags
+    Create,    // Create file if it doesn't exist
+    Exclusive, // Ensure that the file is created; if it already exists, return an error
+    NoCTTY,    // If the file is a terminal, do not make it the controlling terminal
+    Truncate,  // Truncate the file to zero length if it exists and is opened for writing
+    Append,    // Open the file in append mode (writing at the end)
+    NonBlock,  // Non-blocking mode; operations on the file won’t block
+    Dsync,     // Writes will be synchronized with disk before returning (for data)
+    Rsync,     // Data and metadata are synchronized before returning
+
+    // File Locking Flags
+    Async, // Enable asynchronous notification when data is ready for I/O
+    Sync,  // Writes to the file will be synchronized with disk before returning
+
+    // File Type Flags
+    Directory, // Open the file as a directory
+    LargeFile, // Allow opening files larger than 2 GB (on older systems)
+
+    // Additional Flags
+    NoFollow, // Do not follow symbolic links
+    CloExec,  // Set close-on-exec flag, automatically closing the file on exec
 }
 
 /* MOUNT */
@@ -43,33 +75,24 @@ bitflags! {
 #[derive(Clone)]
 pub struct Mount {
     root: Vnode,
-    next: Option<Box<Mount>>,
-    prev: Option<Box<Mount>>,
+    //next: Option<Box<Mount>>,
+    //prev: Option<Box<Mount>>,
     mountpoint: String,
     fs_data: Option<Box<dyn utils::AnyClone>>,
 }
 
 /* VFS */
 
-pub struct VFS {
-    pub root_mount: Box<Mount>,
+pub struct Vfs {
+    pub root_mount: Option<Box<Mount>>,
 }
 
-impl VFS {
+impl Vfs {
+    pub fn new() -> Self {
+        Vfs { root_mount: None }
+    }
+
     pub fn init(&mut self) {
-        self.root_mount = Box::new(Mount {
-            root: Vnode {
-                name: String::from("/"),
-                vtype: VnodeType::Directory,
-                flags: VnodeFlags::ROOT,
-                ops: None,
-                mount: self.root_mount.clone(),
-                fs_data: None,
-            },
-            next: None,
-            prev: None,
-            mountpoint: String::from("/"),
-            fs_data: None,
-        });
+
     }
 }
