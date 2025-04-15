@@ -12,11 +12,24 @@ pub struct Vnode {
     pub vtype: VnodeType,
     pub ops: Option<Box<dyn utils::AnyClone>>,
     pub flags: Option<OpenFlags>,
-    pub mount: Box<Mount>,
+    pub mount: Option<Box<Mount>>,
     pub fs_data: Option<Box<dyn utils::AnyClone>>,
 }
 
-#[derive(Clone)]
+impl Vnode {
+    pub fn new() -> Self {
+        Vnode {
+            name: "".to_string(),
+            vtype: VnodeType::Unknown,
+            ops: None,
+            flags: None,
+            mount: None,
+            fs_data: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum VnodeType {
     Unknown,
     Regular,
@@ -53,7 +66,7 @@ pub enum OpenFlags {
     NoCTTY,    // If the file is a terminal, do not make it the controlling terminal
     Truncate,  // Truncate the file to zero length if it exists and is opened for writing
     Append,    // Open the file in append mode (writing at the end)
-    NonBlock,  // Non-blocking mode; operations on the file won’t block
+    NonBlock,  // Non-blocking mode; operations on the file won't block
     Dsync,     // Writes will be synchronized with disk before returning (for data)
     Rsync,     // Data and metadata are synchronized before returning
 
@@ -74,11 +87,34 @@ pub enum OpenFlags {
 
 #[derive(Clone)]
 pub struct Mount {
-    root: Vnode,
-    //next: Option<Box<Mount>>,
-    //prev: Option<Box<Mount>>,
-    mountpoint: String,
-    fs_data: Option<Box<dyn utils::AnyClone>>,
+    pub root: Option<Vnode>,
+    //pub next: Option<Box<Mount>>,
+    //pub prev: Option<Box<Mount>>,
+    //pub mountpoint: String,
+    pub fs_data: Option<Box<dyn utils::AnyClone>>,
+}
+
+impl Mount {
+    pub fn new() -> Self {
+        Mount {
+            root: Some(Vnode::new()),
+            //next: None,
+            //prev: None,
+            //mountpoint = None,
+            fs_data: None,
+        }
+    }
+
+    // Helper method to initialize root vnode without creating borrow conflicts
+    fn init_root(&mut self) {
+        if let Some(ref mut root) = self.root {
+            root.name = "/".to_string();
+            root.vtype = VnodeType::Directory;
+            root.ops = None;
+            root.flags = None;
+            root.fs_data = None;
+        }
+    }
 }
 
 /* VFS */
@@ -93,6 +129,20 @@ impl Vfs {
     }
 
     pub fn init(&mut self) {
-
+        let mut mount = Mount::new();
+        
+        mount.init_root();
+        
+        let mount_clone = mount.clone();
+        
+        if let Some(ref mut root) = mount.root {
+            println!("> Initializing root vnode...");
+            root.mount = Some(Box::new(mount_clone));
+        } else {
+            println!("> Warning: Mount has no root vnode");
+        }
+        
+        self.root_mount = Some(Box::new(mount));
+        println!("> Root mount initialized.");
     }
 }
