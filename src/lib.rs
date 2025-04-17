@@ -11,5 +11,3 @@ pub enum VnodeType {
     Socket,
     Bad,
 }
-
-
