@@ -39,4 +39,6 @@ pub struct Vfs {
     pub covers: Option<Box<Vnode>>,
 
     pub ops: Box<dyn VfsOps + Send + Sync>,
+
+    pub fs_data:  Box<dyn utils::AnyClone + Send + Sync>,
 }
