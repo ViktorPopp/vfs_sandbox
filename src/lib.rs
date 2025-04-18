@@ -24,18 +24,18 @@ pub trait VnodeOps: Send + Sync {
 }
 
 pub struct Vnode {
-    pub vfs_pointer: Box<Vfs>,
+    pub vfs_pointer: Option<Box<Vfs>>,
     pub vfs_mounted_here: Option<Box<Vfs>>,
     pub ops: Box<dyn VnodeOps + Send + Sync>,
 
     pub vtype: VnodeType,
 
-    pub fs_data: Box<dyn utils::AnyClone + Send + Sync>,
+    pub fs_data: Option<Box<dyn utils::AnyClone + Send + Sync>>,
 }
 
 pub struct Vfs {
     pub next: Option<Box<Vfs>>,
-    pub covers: Option<Box<Vnode>>,
+    pub vnode_pointer: Option<Box<Vnode>>,
 
     pub ops: Option<Box<dyn VfsOps + Send + Sync>>,
 
@@ -46,7 +46,7 @@ impl Vfs {
     pub fn new() -> Self {
         Vfs {
             next: None,
-            covers: None,
+            vnode_pointer: None,
             ops: None,
             fs_data: None,
         }
@@ -55,7 +55,7 @@ impl Vfs {
     pub fn from(ops: Box<dyn VfsOps + Send + Sync>) -> Self {
         Vfs {
             next: None,
-            covers: None,
+            vnode_pointer: None,
             ops: Some(ops),
             fs_data: None,
         }
