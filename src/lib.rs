@@ -1,11 +1,10 @@
 use lazy_static::lazy_static;
-use spin::Mutex;
 
 pub mod fs;
 pub mod utils;
 
 lazy_static! {
-    static ref ROOT_VFS: Mutex<Box<Vfs>> = Mutex::new(Box::new(Vfs::new()));
+    static ref ROOT_VFS: Box<Vfs> = Box::new(Vfs::new());
 }
 
 #[derive(Debug, Clone)]
