@@ -1,14 +1,11 @@
-use spin::Mutex;
+use std::sync::LazyLock;
 
 pub mod utils;
+pub mod fs;
 
-static ROOT_VFS: Mutex<Option<Box<Vfs>>> = Mutex::new(None);
+static mut ROOT_VFS: LazyLock<Box<Vfs>> = LazyLock::new(|| Box::new(Vfs::new()));
 
-pub fn init(vfs: Box<Vfs>) {
-    let mut root_vfs = ROOT_VFS.lock();
-    *root_vfs = Some(vfs);
-}
-
+#[derive(Debug, Clone)]
 pub enum VnodeType {
     None,
     Regular,
@@ -38,7 +35,27 @@ pub struct Vfs {
     pub next: Option<Box<Vfs>>,
     pub covers: Option<Box<Vnode>>,
 
-    pub ops: Box<dyn VfsOps + Send + Sync>,
+    pub ops: Option<Box<dyn VfsOps + Send + Sync>>,
 
-    pub fs_data:  Box<dyn utils::AnyClone + Send + Sync>,
+    pub fs_data: Option<Box<dyn utils::AnyClone + Send + Sync>>,
+}
+
+impl Vfs {
+    pub fn new() -> Self {
+        Vfs {
+            next: None,
+            covers: None,
+            ops: None,
+            fs_data: None,
+        }
+    }
+
+    pub fn from(ops: Box<dyn VfsOps + Send + Sync>) -> Self {
+        Vfs {
+            next: None,
+            covers: None,
+            ops: Some(ops),
+            fs_data: None,
+        }
+    }
 }
