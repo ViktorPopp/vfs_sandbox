@@ -1,9 +1,12 @@
-use std::sync::LazyLock;
+use lazy_static::lazy_static;
+use spin::Mutex;
 
-pub mod utils;
 pub mod fs;
+pub mod utils;
 
-static mut ROOT_VFS: LazyLock<Box<Vfs>> = LazyLock::new(|| Box::new(Vfs::new()));
+lazy_static! {
+    static ref ROOT_VFS: Mutex<Box<Vfs>> = Mutex::new(Box::new(Vfs::new()));
+}
 
 #[derive(Debug, Clone)]
 pub enum VnodeType {
