@@ -25,16 +25,14 @@ pub struct VNode {
 }
 
 impl VNode {
-    // Read content from the file
     pub fn read(&self) -> Option<String> {
         if self.node_type == VNodeType::Regular {
             self.fs.read(&self.path)
         } else {
-            None // You can't read from a directory
+            None
         }
     }
 
-    // Write content to the file
     pub fn write(&self, content: &str) {
         if self.node_type == VNodeType::Regular {
             self.fs.write(&self.path, content);
@@ -59,17 +57,20 @@ impl VFS {
 
     fn find_fs(&self, path: &str) -> Option<(Arc<dyn FileSystem>, String)> {
         let mounts = self.mounts.read();
-        let mut best_match = "";
+        let mut best_match: Option<(&str, &Arc<dyn FileSystem>)> = None;
 
-        for key in mounts.keys() {
-            if path.starts_with(key) && key.len() > best_match.len() {
-                best_match = key;
+        for (key, fs) in mounts.iter() {
+            if path.starts_with(key) {
+                match best_match {
+                    Some((best_key, _)) if key.len() <= best_key.len() => {}
+                    _ => best_match = Some((key.as_str(), fs)),
+                }
             }
         }
 
-        if let Some(fs) = mounts.get(best_match) {
+        if let Some((key, fs)) = best_match {
             let relative_path = path
-                .strip_prefix(best_match)
+                .strip_prefix(key)
                 .unwrap_or("")
                 .trim_start_matches('/');
             Some((fs.clone(), relative_path.to_string()))
@@ -80,20 +81,21 @@ impl VFS {
 
     pub fn lookuppn(&self, full_path: &str) -> Option<VNode> {
         let (fs, rel_path) = self.find_fs(full_path)?;
+
         let node_type = if rel_path.is_empty() || full_path.ends_with('/') {
             VNodeType::Directory
         } else {
             VNodeType::Regular
         };
 
-        let path = if rel_path.is_empty() {
-            full_path.strip_prefix("/").unwrap_or(full_path)
+        let display_path = if rel_path.is_empty() {
+            full_path.strip_prefix('/').unwrap_or(full_path)
         } else {
             &rel_path
         };
-        
+
         Some(VNode {
-            path: path.to_string(),
+            path: display_path.to_string(),
             node_type,
             fs,
         })
