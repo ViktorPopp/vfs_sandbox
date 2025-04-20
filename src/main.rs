@@ -1,33 +1,41 @@
-use std::sync::{Arc, Mutex};
-use vfs_sandbox::*;
-use crate::Vfs;
-use crate::fs::dummy::init;
+extern crate alloc;
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref ROOT_VFS: Arc<Mutex<Vfs>> = Arc::new(Mutex::new(Vfs::new()));
-}
+use alloc::sync::Arc;
+use vfs_sandbox::VFS;
+use vfs_sandbox::fs::memfs::InMemoryFS;
 
 fn main() {
-    let index = init(&ROOT_VFS);
-    println!("DummyFS mounted at index {} in VFS chain", index);
+    let vfs = VFS::new();
 
-    let mut curr = Arc::clone(&ROOT_VFS);
-    let mut i = 0;
-    loop {
-        let next = {
-            let guard = curr.lock().unwrap();
-            println!("VFS at index {} -> vnode present: {}", i, guard.vnode_pointer.is_some());
-            guard.next.clone()
-        };
+    // Create two different in-memory filesystems
+    let mem_fs1 = Arc::new(InMemoryFS::default());
+    let mem_fs2 = Arc::new(InMemoryFS::default());
 
-        match next {
-            Some(next_vfs) => {
-                curr = next_vfs;
-                i += 1;
-            }
-            None => break,
-        }
+    // Mount them at different paths
+    vfs.mount("/mem1", mem_fs1.clone());
+    vfs.mount("/mem2", mem_fs2.clone());
+
+    // Write to each filesystem
+    vfs.write("/mem1/file.txt", "Hello from mem1");
+    vfs.write("/mem2/other.txt", "Greetings from mem2");
+
+    // Read from each filesystem
+    if let Some(content) = vfs.read("/mem1/file.txt") {
+        println!("mem1: {}", content);
+    }
+
+    if let Some(content) = vfs.read("/mem2/other.txt") {
+        println!("mem2: {}", content);
+    }
+
+    // Try reading a file not written
+    if vfs.read("/mem1/missing.txt").is_none() {
+        println!("mem1/missing.txt not found, as expected.");
+    }
+
+    // Write and read deeper paths
+    vfs.write("/mem1/nested/data.txt", "Nested in mem1");
+    if let Some(content) = vfs.read("/mem1/nested/data.txt") {
+        println!("mem1 nested: {}", content);
     }
 }

@@ -1,71 +1,66 @@
-use std::sync::{Arc, Mutex};
+extern crate alloc;
 
-use lazy_static::lazy_static;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
+use spin::RwLock;
 
 pub mod fs;
-pub mod utils;
 
-lazy_static! {
-    pub static ref ROOT_VFS: Arc<Mutex<Vfs>> = Arc::new(Mutex::new(Vfs::new()));
+/// Trait representing a filesystem
+pub trait FileSystem: Send + Sync {
+    fn read(&self, path: &str) -> Option<String>;
+    fn write(&self, path: &str, content: &str);
 }
 
-#[derive(Debug, Clone)]
-pub enum VnodeType {
-    None,
-    Regular,
-    Directory,
+/// The Virtual Filesystem
+pub struct VFS {
+    mounts: RwLock<BTreeMap<String, Arc<dyn FileSystem>>>,
 }
 
-pub trait VfsOps: Send + Sync {
-    fn mount(&self, vfs: Arc<Mutex<Vfs>>, path: String);
-    fn unmount(&self, vfs: Arc<Mutex<Vfs>>);
-}
-
-pub trait VnodeOps: Send + Sync {
-    fn lookup(&self, directory: Vnode, name: String) -> Result<Vnode, String>;
-}
-
-pub struct Vnode {
-    pub vfs_pointer: Option<Arc<Mutex<Vfs>>>,
-    pub vfs_mounted_here: Option<Arc<Mutex<Vfs>>>,
-    pub ops: Arc<dyn VnodeOps + Send + Sync>,
-
-    pub vtype: VnodeType,
-
-    pub fs_data: Option<Box<dyn utils::AnyClone + Send + Sync>>,
-}
-
-pub struct Vfs {
-    pub next: Option<Arc<Mutex<Vfs>>>,
-    pub vnode_pointer: Option<Arc<Mutex<Vnode>>>,
-
-    pub ops: Option<Arc<dyn VfsOps + Send + Sync>>,
-
-    pub fs_data: Option<Box<dyn utils::AnyClone + Send + Sync>>,
-}
-
-impl Vfs {
+impl VFS {
     pub fn new() -> Self {
-        Vfs {
-            next: None,
-            vnode_pointer: None,
-            ops: None,
-            fs_data: None,
+        VFS {
+            mounts: RwLock::new(BTreeMap::new()),
         }
     }
 
-    pub fn from(ops: Arc<dyn VfsOps + Send + Sync>) -> Self {
-        Vfs {
-            next: None,
-            vnode_pointer: None,
-            ops: Some(ops),
-            fs_data: None,
+    /// Mount a filesystem at a given path
+    pub fn mount(&self, mount_point: &str, fs: Arc<dyn FileSystem>) {
+        self.mounts.write().insert(mount_point.to_string(), fs);
+    }
+
+    /// Find the best mount point match for the given path
+    fn find_fs(&self, path: &str) -> Option<(Arc<dyn FileSystem>, String)> {
+        let mounts = self.mounts.read();
+        let mut best_match = "";
+
+        for key in mounts.keys() {
+            if path.starts_with(key) && key.len() > best_match.len() {
+                best_match = key;
+            }
+        }
+
+        if let Some(fs) = mounts.get(best_match) {
+            let relative_path = path
+                .strip_prefix(best_match)
+                .unwrap_or("")
+                .trim_start_matches('/');
+            Some((fs.clone(), relative_path.to_string()))
+        } else {
+            None
         }
     }
-}
 
-impl Default for Vfs {
-    fn default() -> Self {
-        Self::new()
+    pub fn read(&self, path: &str) -> Option<String> {
+        self.find_fs(path).and_then(|(fs, rel_path)| fs.read(&rel_path))
+    }
+
+    pub fn write(&self, path: &str, content: &str) {
+        if let Some((fs, rel_path)) = self.find_fs(path) {
+            fs.write(&rel_path, content);
+        } else {
+            println!("No filesystem mounted for path: {}", path);
+        }
     }
 }
