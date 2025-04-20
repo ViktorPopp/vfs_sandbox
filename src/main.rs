@@ -10,29 +10,41 @@ fn main() {
     let root_fs = Arc::new(InMemoryFS::default());
     let nested_fs = Arc::new(InMemoryFS::default());
 
-    vfs.mount("/root", root_fs.clone());
-    vfs.mount("/root/nested", nested_fs.clone());
+    vfs.mount("/root/", root_fs.clone());
+    vfs.mount("/root/nested/", nested_fs.clone());
 
-    vfs.write("/root/file.txt", "Hello from root");
-    vfs.write("/root/nested/other.txt", "Greetings from nested");
-
-    if let Some(content) = vfs.read("/root/file.txt") {
-        println!("Read root: {}", content);
+    // Writing through VNodes
+    if let Some(vnode) = vfs.lookuppn("/root/file.txt") {
+        vnode.write("Hello from root");
     }
 
-    if let Some(content) = vfs.read("/root/nested/other.txt") {
-        println!("Read nested: {}", content);
+    if let Some(vnode) = vfs.lookuppn("/root/nested/other.txt") {
+        vnode.write("Greetings from nested");
     }
 
-    if let Some(vnode) = vfs.lookup_pn("/root/file.txt") {
-        println!("VNode: {:?}, Type: {:?}", vnode.path, vnode.node_type);
+    print!("\n");
+
+    // Reading through VNodes
+    if let Some(vnode) = vfs.lookuppn("/root/file.txt") {
+        if let Some(content) = vnode.read() {
+            println!("Read from root: \t\t{}", content);
+        }
     }
 
-    if let Some(vnode) = vfs.lookup_pn("/root/") {
-        println!("VNode: {:?}, Type: {:?}", vnode.path, vnode.node_type);
+    if let Some(vnode) = vfs.lookuppn("/root/nested/other.txt") {
+        if let Some(content) = vnode.read() {
+            println!("Read from nested: \t\t{}", content);
+        }
     }
 
-    if let Some(vnode) = vfs.lookup_pn("/root/nested/other.txt") {
-        println!("VNode: {:?}, Type: {:?}", vnode.path, vnode.node_type);
+    print!("\n");
+
+    // Lookup directories and files
+    if let Some(vnode) = vfs.lookuppn("/root/") {
+        println!("VNode: {:?}, \t\tType: {:?}", vnode.path, vnode.node_type);
+    }
+
+    if let Some(vnode) = vfs.lookuppn("/root/nested/other.txt") {
+        println!("VNode: {:?}, \t\tType: {:?}", vnode.path, vnode.node_type);
     }
 }
