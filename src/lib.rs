@@ -54,7 +54,7 @@ impl VFS {
     }
 
     pub fn mount(&self, mount_point: &str, fs: Arc<dyn FileSystem>) {
-        self.mounts.write().insert(mount_point.to_string(), fs);
+        self.mounts.write().insert(String::from(mount_point), fs);
     }
 
     fn find_fs(&self, path: &str) -> Option<(Arc<dyn FileSystem>, String)> {
@@ -86,14 +86,14 @@ impl VFS {
             VNodeType::Regular
         };
 
-        let display_path = if rel_path.is_empty() {
-            full_path.strip_prefix("/").unwrap_or(full_path).to_string()
+        let path = if rel_path.is_empty() {
+            full_path.strip_prefix("/").unwrap_or(full_path)
         } else {
-            rel_path
+            &rel_path
         };
-
+        
         Some(VNode {
-            path: display_path,
+            path: path.to_string(),
             node_type,
             fs,
         })
