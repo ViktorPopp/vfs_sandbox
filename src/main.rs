@@ -1,8 +1,8 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-use vfs_sandbox::VFS;
 use vfs_sandbox::fs::memfs::InMemoryFS;
+use vfs_sandbox::*;
 
 fn main() {
     let vfs = VFS::new();
@@ -13,38 +13,52 @@ fn main() {
     vfs.mount("/root/", root_fs.clone());
     vfs.mount("/root/nested/", nested_fs.clone());
 
+    println!("\n-- Writing Files --");
+
     // Writing through VNodes
-    if let Some(vnode) = vfs.lookuppn("/root/file.txt") {
-        vnode.write("Hello from root");
-    }
-
-    if let Some(vnode) = vfs.lookuppn("/root/nested/other.txt") {
-        vnode.write("Greetings from nested");
-    }
-
-    print!("\n");
-
-    // Reading through VNodes
-    if let Some(vnode) = vfs.lookuppn("/root/file.txt") {
-        if let Some(content) = vnode.read() {
-            println!("Read from root: \t\t{}", content);
+    match vfs.lookuppn("/root/file.txt") {
+        Ok(vnode) => {
+            vnode.write("Hello from root").expect("Write failed");
+            println!("Wrote to /root/file.txt");
         }
+        Err(e) => println!("Error looking up /root/file.txt: {}", e),
     }
 
-    if let Some(vnode) = vfs.lookuppn("/root/nested/other.txt") {
-        if let Some(content) = vnode.read() {
-            println!("Read from nested: \t\t{}", content);
+    match vfs.lookuppn("/root/nested/other.txt") {
+        Ok(vnode) => {
+            vnode.write("Greetings from nested").expect("Write failed");
+            println!("Wrote to /root/nested/other.txt");
         }
+        Err(e) => println!("Error looking up /root/nested/other.txt: {}", e),
     }
 
-    print!("\n");
+    println!("\n-- Reading Files --");
 
-    // Lookup directories and files
-    if let Some(vnode) = vfs.lookuppn("/root/") {
-        println!("VNode: {:?}, \t\tType: {:?}", vnode.path, vnode.node_type);
+    match vfs.lookuppn("/root/file.txt") {
+        Ok(vnode) => match vnode.read() {
+            Ok(content) => println!("Read from root:   \t{}", content),
+            Err(e) => println!("Error reading /root/file.txt: {}", e),
+        },
+        Err(e) => println!("Lookup failed: {}", e),
     }
 
-    if let Some(vnode) = vfs.lookuppn("/root/nested/other.txt") {
-        println!("VNode: {:?}, \t\tType: {:?}", vnode.path, vnode.node_type);
+    match vfs.lookuppn("/root/nested/other.txt") {
+        Ok(vnode) => match vnode.read() {
+            Ok(content) => println!("Read from nested:\t{}", content),
+            Err(e) => println!("Error reading /root/nested/other.txt: {}", e),
+        },
+        Err(e) => println!("Lookup failed: {}", e),
+    }
+
+    println!("\n-- Directory Info --");
+
+    match vfs.lookuppn("/root/") {
+        Ok(vnode) => println!("VNode: {:?} \t\tType: {:?}", vnode.path, vnode.node_type),
+        Err(e) => println!("Error looking up /root/: {}", e),
+    }
+
+    match vfs.lookuppn("/root/nested/other.txt") {
+        Ok(vnode) => println!("VNode: {:?} \tType: {:?}", vnode.path, vnode.node_type),
+        Err(e) => println!("Error looking up /root/nested/other.txt: {}", e),
     }
 }
