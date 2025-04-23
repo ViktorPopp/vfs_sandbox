@@ -71,14 +71,14 @@ impl Vfs {
     pub fn lookuppn(&self, path: &str) -> Result<Arc<Vnode>, VfsError> {
         let mut components = path.split('/').peekable();
         let mut current_vnode = if path.starts_with('/') {
-            self.findfs("/") // Use the root vnode for absolute paths
+            self.findfs("/")
         } else {
             self.findfs(components.next().unwrap_or(""))
         };
 
         while let Some(component) = components.next() {
             if component.is_empty() {
-                continue; // Skip empty components (e.g., from "//")
+                continue;
             }
             if let Some(vnode) = current_vnode {
                 current_vnode = Some(Arc::new(

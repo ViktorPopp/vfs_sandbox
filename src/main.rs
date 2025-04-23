@@ -11,7 +11,7 @@ fn main() {
     // Create root vnode
     let root_vnode = Arc::new(Vnode {
         vtype: VNodeType::Directory,
-        ops: Arc::new(MockFs),
+        ops: MockFs::instance(),
     });
 
     // Mount root
